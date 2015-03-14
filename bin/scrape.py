@@ -33,12 +33,10 @@ def simulate_season(df):
         simulate_game(calculator, row, team_elos)
 
     columns = ('team', 'mean', 'kfactor')
-    import ipdb; ipdb.set_trace()
     data = [(k, v.mean, v.k_factor) for k,v in team_elos.iteritems()]
     team_df = pd.DataFrame(data, columns=columns)
 
-    import ipdb; ipdb.set_trace()
-    print team_elos
+    return team_elos
 
 def simulate_game(calculator, row, teams):
     team1, team2 = get_teams(row['TEAMS'])
@@ -76,46 +74,50 @@ def simulate_game(calculator, row, teams):
     teams[team1] = (new_ratings.rating_by_id(1))
     teams[team2] = (new_ratings.rating_by_id(2))
 
-url = "http://highschoolsports.mlive.com/sprockets/game_search_results/?config=3853&season=2327&sport=200&page={}".format(1)
-req = requests.get(url)
-page = BeautifulSoup.BeautifulSoup(req.text)
-pages = page.find('span', {'class': 'page-of'})
-num_pages = get_pages(pages.text)
-
-headings = None
-data_rows = []
-max_page = 2
-for page_num in range(1,num_pages):
-    if page_num > max_page:
-        break
-    print "Fetching page {}".format(page_num)
-    url = "http://highschoolsports.mlive.com/sprockets/game_search_results/?config=3853&season=2327&sport=200&page={}".format(page_num)
+def get_page_count():
+    url = "http://highschoolsports.mlive.com/sprockets/game_search_results/?config=3853&season=2327&sport=200&page={}".format(1)
     req = requests.get(url)
-    time.sleep(1)
     page = BeautifulSoup.BeautifulSoup(req.text)
-    table = page.find("div", {"class": "stats-table scores"})
-    for row in table.findAll('tr'):
-        if row.find('th'):
-            if not headings:
-                headings = []
-                cols = row.findAll('th')
-                for col in cols:
-                    headings.append(col.text)
-        else:
-            cols = row.findAll('td')
-            content = []
-            for col in cols:
-                divs = col.findAll('div')
-                if not divs:
-                    #Some rows are just text
-                    text = col.text
-                else:
-                    text = "\t".join([div.text for div in divs])
-                content.append(text)
-            data_rows.append(tuple(content))
+    pages = page.find('span', {'class': 'page-of'})
+    num_pages = get_pages(pages.text)
+    return num_pages
 
-df = pd.DataFrame(data_rows, columns=headings)
-simulate_season(df)
+def parse_season(max_pages=None):
+
+    headings = None
+    data_rows = []
+    for page_num in range(1,num_pages):
+        if max_pages and page_num > max_page:
+            break
+        print "Fetching page {}".format(page_num)
+        url = "http://highschoolsports.mlive.com/sprockets/game_search_results/?config=3853&season=2327&sport=200&page={}".format(page_num)
+        req = requests.get(url)
+        time.sleep(1)
+        page = BeautifulSoup.BeautifulSoup(req.text)
+        table = page.find("div", {"class": "stats-table scores"})
+        for row in table.findAll('tr'):
+            if row.find('th'):
+                if not headings:
+                    headings = []
+                    cols = row.findAll('th')
+                    for col in cols:
+                        headings.append(col.text)
+            else:
+                cols = row.findAll('td')
+                content = []
+                for col in cols:
+                    divs = col.findAll('div')
+                    if not divs:
+                        #Some rows are just text
+                        text = col.text
+                    else:
+                        text = "\t".join([div.text for div in divs])
+                    content.append(text)
+                data_rows.append(tuple(content))
+    
+    games_df = pd.DataFrame(data_rows, columns=headings)
+    teams_df = simulate_season(df)
+    return teams_df
 
 pass
     
